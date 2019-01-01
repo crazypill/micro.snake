@@ -22,8 +22,6 @@
 
 static Adafruit_miniTFTWing ss;
 static bool                 s_state_running = false;
-static float                p = 3.1415926;
-
 
 
 void setup() 
