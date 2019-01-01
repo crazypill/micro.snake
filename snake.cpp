@@ -5,20 +5,19 @@
 //  Created by Alex Lelievre on 12/26/18.
 //
 
-
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // don't erase the screen on game over for debugging collisions
 //#define KEEP_DISPLAY_FOR_DEBUG
 
-// do this once
+// do this once so that the flash is prepped for use
 //#define ERASE_FLASH
+
+// this controls whether or not we use the FatFS file system on the flash device.
 #define FLASH_FS
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 #include "snake.h"
 
@@ -26,22 +25,21 @@
 #include <Adafruit_SPIFlash_FatFs.h>
 #endif
 
-//#define FLASH_DEVICE_S25FL1
 #define FLASH_DEVICE_GD25Q
+//#define FLASH_DEVICE_S25FL1
 //#define FLASH_DEVICE_GENERIC
 
 #ifdef FLASH_DEVICE_GD25Q
-
-#include "Adafruit_QSPI_GD25Q.h"
-static Adafruit_QSPI_GD25Q flash;
+  #include "Adafruit_QSPI_GD25Q.h"
+  static Adafruit_QSPI_GD25Q flash;
 #elif defined(FLASH_DEVICE_S25FL1)
-#include "Adafruit_QSPI_S25FL1.h"
-static Adafruit_QSPI_S25FL1 flash;
+  #include "Adafruit_QSPI_S25FL1.h"
+  static Adafruit_QSPI_S25FL1 flash;
 #elif defined(FLASH_DEVICE_S25FL1)
-#include "Adafruit_QSPI_Generic.h"
-static Adafruit_QSPI_Generic flash;
+  #include "Adafruit_QSPI_Generic.h"
+  static Adafruit_QSPI_Generic flash;
 #else
-#error "Flash Device not supported."
+  #error "Flash Device not supported."
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +72,10 @@ typedef struct
     uint16_t length;    // how long it is...only used for snake draw
 } Segment;
 
+
 #pragma mark -
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static Segment snake_draw  = { kStartingPointX, kStartingPointY, 0, 1, 0, 0, 10 };    
 static Segment snake_erase = { kStartingPointX, kStartingPointY, 0, 1, 0, 0, 1 };    
@@ -103,6 +104,8 @@ static Adafruit_W25Q16BV_FatFs fatfs( flash );
 #endif
 
 
+#pragma mark -
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void check_for_apple();
@@ -114,6 +117,9 @@ void erase_snake();
 void draw_segments();
 bool snake_in_segment();
 void print_error( const char* error );
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma mark -
 
