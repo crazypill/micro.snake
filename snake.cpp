@@ -99,6 +99,7 @@ void check_for_direction_change();
 void boundary_clamp( Segment* );
 void erase_snake();
 bool snake_in_segment();
+void debug_draw_segments();
 void print_error( const char* error );
 
 #pragma mark -
@@ -167,13 +168,20 @@ bool nearly_equals( int16_t p1, int16_t p2, int16_t errorTolerance )
 }
 
 
-bool dot_in_segment( int16_t x, int16_t y, Segment* seg )
+bool dot_in_segment( int16_t x, int16_t y, int16_t index )
 {
+    Segment* seg = &s_segments[index];
+
+//    Serial.print( "seg->x - seg_start_x: " ); 
+//    Serial.println( seg->x - seg_start_x );
+    
     // first determine if this line is vertical or horizontal
-    int16_t v = abs( seg->x - seg_start_x );
-    if( v == 0 )
+    if( (seg->x - seg_start_x) == 0 )
     {   
-        // line is vertical -- see if point is within the line somewhere (not necessarily the segment but a line is infinite)
+        Serial.print( "v: " );
+        Serial.println( index );
+        
+        // line is vertical -- see if point is within the segment
         if( x == seg->x )
         {
             int16_t minY = min( seg->start_y, seg->y );
@@ -184,6 +192,8 @@ bool dot_in_segment( int16_t x, int16_t y, Segment* seg )
     else
     {
         // horizontal
+        Serial.print( "h: " );
+        Serial.println( index );
         if( y == seg->y )
         {
             int16_t minX = min( seg->start_x, seg->x );
@@ -307,7 +317,9 @@ void game_over()
     if( s_score > high_score )
       set_high_score( s_score );
 
-#ifndef KEEP_DISPLAY_FOR_DEBUG    
+#ifdef KEEP_DISPLAY_FOR_DEBUG
+    debug_draw_segments();
+#else
     delay( 1500 );  // 1.5 secs
     tft.fillScreen( ST77XX_BLACK );
 
@@ -461,7 +473,7 @@ bool snake_in_segment()
     {
         // first segment is at reader index
         int index = (s_segment_reader + i) % kMaxSegments;
-        if( dot_in_segment( snake_draw.x, snake_draw.y, &s_segments[index] ) )
+        if( dot_in_segment( snake_draw.x, snake_draw.y, index ) )
         {
             Serial.print( "snake_in_segment: " ); 
             Serial.print( index );
@@ -489,7 +501,6 @@ bool snake_in_segment()
             Serial.println( s_segment_count );
             
             dump_segments();
-            debug_draw_segments();
             return true;
         }
     }
@@ -551,7 +562,7 @@ bool apple_in_segment()
     {
         // first segment is at reader index
         int index = (s_segment_reader + i) % kMaxSegments;
-        if( dot_in_segment( apple_x, apple_y, &s_segments[index] ) )
+        if( dot_in_segment( apple_x, apple_y, index ) )
             return true;
     }
     
