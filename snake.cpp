@@ -229,7 +229,7 @@ bool initialize_graphics()
   tft.setRotation( 3 );
   tft.fillScreen( ST77XX_BLACK );
   if( !flash.begin() )
-    Serial.println("Could not find flash on QSPI bus!");
+    Serial.println( "Could not find flash on QSPI bus!" );
 
   flash.setFlashType( SPIFLASHTYPE_W25Q16BV );
 
@@ -238,7 +238,7 @@ bool initialize_graphics()
   fatfs.activate();
 
   // Partition the flash with 1 partition that takes the entire space.
-  Serial.println("Partitioning flash with 1 primary partition...");
+  Serial.println( "Partitioning flash with 1 primary partition..." );
   DWORD plist[] = {100, 0, 0, 0};  // 1 primary partition with 100% of space.
   uint8_t buf[512] = {0};          // Working buffer for f_fdisk function.
   FRESULT r = f_fdisk(0, plist, buf);
@@ -254,16 +254,16 @@ bool initialize_graphics()
   r = f_mkfs( "", FM_ANY, 0, buf, sizeof(buf) );
   if (r != FR_OK) 
   {
-    Serial.print("Error, f_mkfs failed with error code: "); Serial.println(r, DEC);
+    Serial.print( "Error, f_mkfs failed with error code: " ); Serial.println(r, DEC);
     return false;
   }
-  Serial.println("Formatted flash!");
+  Serial.println( "Formatted flash!" );
 #endif // ERASE_FLASH
 
   // Finally test that the filesystem can be mounted.
   if( !fatfs.begin() )
   {
-    Serial.println("Error, failed to mount filesystem!");
+    Serial.println( "Error, failed to mount filesystem!" );
     return false;
   }
 #else
@@ -354,6 +354,7 @@ void game_over()
     draw_segments();
 #endif
 
+    // !!@ we should wait for buttons here to restart the game rather than use the RESET line
     while( 1 )
       ;
 }
