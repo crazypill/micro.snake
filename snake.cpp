@@ -38,7 +38,7 @@ static Adafruit_QSPI_Generic flash;
 
 
 #define kMinDelay     5 
-#define kLineWidth    2
+#define kLineWidth    3
 #define kMaxSegments  100
 #define kScreenWidth  tft.width() 
 #define kScreenHeight tft.height()
@@ -87,7 +87,7 @@ static Segment  s_segments[kMaxSegments];
 static Adafruit_ST7735         tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
 static Adafruit_W25Q16BV_FatFs fatfs( flash );
 
-static uint8_t s_high_score[2]; // make a short
+static uint8_t s_high_score[512]; // make a short
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,8 +98,8 @@ bool apple_in_segment();
 void check_for_direction_change();
 void boundary_clamp( Segment* );
 void erase_snake();
+void draw_segments();
 bool snake_in_segment();
-void debug_draw_segments();
 void print_error( const char* error );
 
 #pragma mark -
@@ -138,51 +138,19 @@ void set_high_score( int16_t score )
 }
 
 
-int16_t fast_length( int16_t x, int16_t y )
-{
-    int16_t dx = abs( x );
-    int16_t dy = abs( y );
-    return dx + dy - (min( dx, dy ) >> 1);
-}
-
-
-// returns length from origin (or length/magnitude of vector)
-int16_t fast_hvline_length( int16_t x, int16_t y )
-{
-    // it's assumed that this line is horizontal or vertical
-    if( !x && !y )
-        return 0;
-    
-    // this is easy :)   the idea here is that we can easily count the length by using the coorindate which is always h/v from origin
-    if( !x )
-        return abs( y );
-    
-    // line is assumed to be horizontal here
-    return abs( x );
-}
-
-
 bool nearly_equals( int16_t p1, int16_t p2, int16_t errorTolerance )
 {
     return abs( p1 - p2 ) <= errorTolerance && abs( p1 - p2 ) <= errorTolerance;
 }
 
 
-bool dot_in_segment( int16_t x, int16_t y, int16_t index )
+bool dot_in_segment( int16_t x, int16_t y, Segment* seg, int16_t tolerance )
 {
-    Segment* seg = &s_segments[index];
-
-//    Serial.print( "seg->x - seg_start_x: " ); 
-//    Serial.println( seg->x - seg_start_x );
-    
     // first determine if this line is vertical or horizontal
-    if( (seg->x - seg_start_x) == 0 )
+    if( seg->x == seg->start_x )
     {   
-        Serial.print( "v: " );
-        Serial.println( index );
-        
         // line is vertical -- see if point is within the segment
-        if( x == seg->x )
+        if( nearly_equals( x, seg->x, tolerance ) )
         {
             int16_t minY = min( seg->start_y, seg->y );
             int16_t maxY = max( seg->start_y, seg->y );
@@ -192,9 +160,7 @@ bool dot_in_segment( int16_t x, int16_t y, int16_t index )
     else
     {
         // horizontal
-        Serial.print( "h: " );
-        Serial.println( index );
-        if( y == seg->y )
+        if( nearly_equals( y, seg->y, tolerance ) )
         {
             int16_t minX = min( seg->start_x, seg->x );
             int16_t maxX = max( seg->start_x, seg->x );
@@ -317,11 +283,11 @@ void game_over()
     if( s_score > high_score )
       set_high_score( s_score );
 
-#ifdef KEEP_DISPLAY_FOR_DEBUG
-    debug_draw_segments();
-#else
     delay( 1500 );  // 1.5 secs
+
+#ifndef KEEP_DISPLAY_FOR_DEBUG    
     tft.fillScreen( ST77XX_BLACK );
+#endif
 
     tft.setCursor( 0, 0 );
     tft.setTextColor( ST77XX_RED );
@@ -339,10 +305,13 @@ void game_over()
     tft.setTextSize( 1 );
     tft.print( "High score: " );
     tft.println( get_high_score() );
+
+#ifdef KEEP_DISPLAY_FOR_DEBUG    
+    draw_segments();
 #endif
 
     while( 1 )
-    ;
+      ;
 }
 
 
@@ -426,7 +395,7 @@ void move_snake()
 }
 
 
-void debug_draw_segments()
+void draw_segments()
 {
     for( int i = 0; i < s_segment_count; i++ )
     {
@@ -434,6 +403,8 @@ void debug_draw_segments()
         int index = (s_segment_reader + i) % kMaxSegments;
         tft.drawLine( s_segments[index].start_x, s_segments[index].start_y, s_segments[index].x, s_segments[index].y, ST77XX_WHITE );
     }
+    draw_dot( snake_draw.x, snake_draw.y, ST77XX_BLUE );
+    draw_dot( snake_erase.x, snake_erase.y, ST77XX_RED );
 }
 
 
@@ -473,7 +444,7 @@ bool snake_in_segment()
     {
         // first segment is at reader index
         int index = (s_segment_reader + i) % kMaxSegments;
-        if( dot_in_segment( snake_draw.x, snake_draw.y, index ) )
+        if( dot_in_segment( snake_draw.x, snake_draw.y, &s_segments[index], 0 ) )
         {
             Serial.print( "snake_in_segment: " ); 
             Serial.print( index );
@@ -497,6 +468,8 @@ bool snake_in_segment()
             Serial.print( s_segments[index].y );
             Serial.print( "), writer index: " );
             Serial.print( s_segment_writer );
+            Serial.print( ", reader index: " );
+            Serial.print( s_segment_reader );
             Serial.print( ", segment count: " );
             Serial.println( s_segment_count );
             
@@ -562,7 +535,7 @@ bool apple_in_segment()
     {
         // first segment is at reader index
         int index = (s_segment_reader + i) % kMaxSegments;
-        if( dot_in_segment( apple_x, apple_y, index ) )
+        if( dot_in_segment( apple_x, apple_y, &s_segments[index], kLineWidth ) )
             return true;
     }
     
@@ -597,7 +570,6 @@ void add_segment()
     // used for collision testing of this segment
     s_segments[s_segment_writer].start_x = seg_start_x;
     s_segments[s_segment_writer].start_y = seg_start_y;
-    s_segments[s_segment_writer].length  = fast_hvline_length( snake_draw.x - seg_start_x, snake_draw.y - seg_start_y );
     ++s_segment_writer;
     ++s_segment_count;
     
@@ -627,8 +599,16 @@ void check_for_direction_change()
     if( s_segments[index].x == snake_erase.x && s_segments[index].y == snake_erase.y )
     {
         // read the data and pop it off
-        snake_erase.dir_x = s_segments[s_segment_reader].dir_x;
-        snake_erase.dir_y = s_segments[s_segment_reader].dir_y;
+        snake_erase.dir_x = s_segments[index].dir_x;
+        snake_erase.dir_y = s_segments[index].dir_y;
+
+        // !!@ debug erase here - can be removed
+        s_segments[index].start_x = 0;
+        s_segments[index].start_y = 0;
+        s_segments[index].dir_x = 0;
+        s_segments[index].dir_y = 0;
+        s_segments[index].x = 0;
+        s_segments[index].y = 0;
                 
         // pop the segment too!
         ++s_segment_reader;
