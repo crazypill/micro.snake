@@ -1,5 +1,5 @@
 //
-//  snake.c
+//  snake.cpp
 //  
 //
 //  Created by Alex Lelievre on 12/26/18.

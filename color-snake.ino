@@ -1,13 +1,9 @@
-/***************************************************
-  This is a library for the Adafruit 0.96" Mini TFT Featherwing
-  
-  Adafruit invests time and resources providing this open source code,
-  please support Adafruit and open-source hardware by purchasing
-  products from Adafruit!
-
-  Written by Limor Fried/Ladyada for Adafruit Industries.
-  MIT license, all text above must be included in any redistribution
- ****************************************************/
+//
+//  color-snake.ino
+//  
+//
+//  Created by Alex Lelievre on 12/26/18 (most of this source file from Adafruit).
+//
 
 #include "snake.h"
 #include "Adafruit_miniTFTWing.h"
