@@ -598,7 +598,7 @@ void check_for_direction_change()
         return;
         
     // see if we are standing on a direction change
-    int index = (s_segment_reader + i) % kMaxSegments;
+    int index = s_segment_reader % kMaxSegments;
 
     if( s_segments[index].x == snake_erase.x && s_segments[index].y == snake_erase.y )
     {
