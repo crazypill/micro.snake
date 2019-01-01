@@ -65,7 +65,7 @@ void loop()
         
     draw_snake();
 
-    if( !(buttons & TFTWING_BUTTON_B) ) 
+    if( !(buttons & TFTWING_BUTTON_A) ) 
         pause();
 
 #ifdef DISPLAY_INVERTED

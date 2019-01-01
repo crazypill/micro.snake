@@ -13,7 +13,6 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 
 
-
 #define TFT_RST    -1    // we use the seesaw for resetting to save a pin
 
 #ifdef ESP8266

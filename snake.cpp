@@ -7,7 +7,35 @@
 
 #include "snake.h"
 
+#include <Adafruit_SPIFlash_FatFs.h>
+
+//#define FLASH_DEVICE_S25FL1
+#define FLASH_DEVICE_GD25Q
+//#define FLASH_DEVICE_GENERIC
+
+#ifdef FLASH_DEVICE_GD25Q
+
+#include "Adafruit_QSPI_GD25Q.h"
+static Adafruit_QSPI_GD25Q flash;
+#elif defined(FLASH_DEVICE_S25FL1)
+#include "Adafruit_QSPI_S25FL1.h"
+static Adafruit_QSPI_S25FL1 flash;
+#elif defined(FLASH_DEVICE_S25FL1)
+#include "Adafruit_QSPI_Generic.h"
+static Adafruit_QSPI_Generic flash;
+#else
+#error "Flash Device not supported."
+#endif
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// don't erase the screen on game over for debugging collisions
+//#define KEEP_DISPLAY_FOR_DEBUG
+
+// do this once
+//#define ERASE_FLASH
+
+
 
 #define kMinDelay     5 
 #define kLineWidth    2
@@ -17,8 +45,6 @@
 #define kStartingPointX  80
 #define kStartingPointY  40
 
-// don't erase the screen on game over for debugging collisions
-//#define KEEP_DISPLAY_FOR_DEBUG
 
 #pragma mark -
 
@@ -58,7 +84,10 @@ static uint16_t s_segment_writer = 0;
 static uint16_t s_segment_reader = 0;
 static Segment  s_segments[kMaxSegments];
 
-static Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
+static Adafruit_ST7735         tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
+static Adafruit_W25Q16BV_FatFs fatfs( flash );
+
+static uint8_t s_high_score[2]; // make a short
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +102,39 @@ bool snake_in_segment();
 void print_error( const char* error );
 
 #pragma mark -
+
+
+int16_t get_high_score()
+{
+  File readFile = fatfs.open( "highscore", FILE_READ );
+  if( !readFile )
+  {
+    Serial.println("Error, failed to open highscore for reading!");
+    return 0;
+  }
+
+  int16_t score = 0;
+  readFile.read( &score, sizeof( score ) );
+  readFile.close();
+  return score;
+//    flash.readMemory( 0, s_high_score, sizeof( s_high_score ) );
+//    return *((int16_t*)&s_high_score);
+}
+
+void set_high_score( int16_t score )
+{
+  File writeFile = fatfs.open( "highscore", FILE_WRITE );
+  if( !writeFile )
+  {
+    Serial.println("Error, failed to open highscore for writing!");
+    return;
+  }
+
+  writeFile.write( score );
+  writeFile.close();
+//    *((int16_t*)&s_high_score) = score;
+//    flash.writeMemory( 0, s_high_score, sizeof( s_high_score ) );
+}
 
 
 int16_t fast_length( int16_t x, int16_t y )
@@ -112,16 +174,22 @@ bool dot_in_segment( int16_t x, int16_t y, Segment* seg )
     if( v == 0 )
     {   
         // line is vertical -- see if point is within the line somewhere (not necessarily the segment but a line is infinite)
-//        if( nearly_equals( x, seg->x, /*kLineWidth*/ 0 ) )
         if( x == seg->x )
-            return (y > seg->start_y && y < seg->y);
+        {
+            int16_t minY = min( seg->start_y, seg->y );
+            int16_t maxY = max( seg->start_y, seg->y );
+            return (y > minY && y < maxY);
+        }
     }
     else
     {
         // horizontal
-//        if( nearly_equals( y, seg->y, /*kLineWidth*/ 0 ) )
         if( y == seg->y )
-            return (x > seg->start_x && x < seg->x);
+        {
+            int16_t minX = min( seg->start_x, seg->x );
+            int16_t maxX = max( seg->start_x, seg->x );
+            return (x > minX && x < maxX);
+        }
     }
 
     return false;
@@ -149,6 +217,38 @@ bool initialize_graphics()
   tft.initR( INITR_MINI160x80 );   // initialize a ST7735S chip, mini display
   tft.setRotation( 3 );
   tft.fillScreen( ST77XX_BLACK );
+  if( !flash.begin() )
+    Serial.println("Could not find flash on QSPI bus!");
+
+  flash.setFlashType( SPIFLASHTYPE_W25Q16BV );
+  fatfs.activate();
+  
+#ifdef ERASE_FLASH
+  // Partition the flash with 1 partition that takes the entire space.
+  Serial.println("Partitioning flash with 1 primary partition...");
+  DWORD plist[] = {100, 0, 0, 0};  // 1 primary partition with 100% of space.
+  uint8_t buf[512] = {0};          // Working buffer for f_fdisk function.
+  FRESULT r = f_fdisk(0, plist, buf);
+  if (r != FR_OK) {
+    Serial.print("Error, f_fdisk failed with error code: "); Serial.println(r, DEC);
+    while(1);
+  }
+  Serial.println("Partitioned flash!");
+
+  // Make filesystem.
+  Serial.println("Creating and formatting FAT filesystem (this takes ~60 seconds)...");
+  r = f_mkfs("", FM_ANY, 0, buf, sizeof(buf));
+  if (r != FR_OK) {
+    Serial.print("Error, f_mkfs failed with error code: "); Serial.println(r, DEC);
+    while(1);
+  }
+  Serial.println("Formatted flash!");
+#endif  
+
+  // Finally test that the filesystem can be mounted.
+  if( !fatfs.begin() )
+    Serial.println("Error, failed to mount filesystem!");
+  
   return true;
 }
 
@@ -198,6 +298,10 @@ void game_over()
         delay( 50 );
     }
 
+    int16_t high_score = get_high_score();
+    if( s_score > high_score )
+      set_high_score( s_score );
+
 #ifndef KEEP_DISPLAY_FOR_DEBUG    
     delay( 1500 );  // 1.5 secs
     tft.fillScreen( ST77XX_BLACK );
@@ -212,6 +316,12 @@ void game_over()
     tft.setTextSize( 1 );
     tft.print( "Your score: " );
     tft.println( s_score );
+    
+    tft.setCursor( 38, 54 );
+    tft.setTextColor( ST77XX_YELLOW );
+    tft.setTextSize( 1 );
+    tft.print( "High score: " );
+    tft.println( get_high_score() );
 #endif
 
     while( 1 )
@@ -331,10 +441,6 @@ void dump_segments()
 
 bool snake_in_segment()
 {
-    // we need at least 4 segments in order to intersect with ourselves
-    if( s_segment_count < 4 )
-        return false;
-        
     // go thru all the segments and see if we intersect any
     for( int i = 0; i < s_segment_count; i++ )
     {
@@ -457,7 +563,7 @@ void add_segment()
     s_segments[s_segment_writer].dir_y   = snake_draw.dir_y;
 
     // if this is the first segment, the end of it is not the starting point, it's the eraser's head
-    if( !s_segment_writer )
+    if( !s_segment_count )
     {
         seg_start_x = snake_erase.x;
         seg_start_y = snake_erase.y;
@@ -466,7 +572,6 @@ void add_segment()
     // used for collision testing of this segment
     s_segments[s_segment_writer].start_x = seg_start_x;
     s_segments[s_segment_writer].start_y = seg_start_y;
-    s_segments[s_segment_writer].length  = fast_hvline_length( snake_draw.x - seg_start_x, snake_draw.y - seg_start_y );
     ++s_segment_writer;
     ++s_segment_count;
     
@@ -508,6 +613,12 @@ void check_for_direction_change()
 //        Serial.print( s_segment_count );
 //        Serial.print( ", s_segment_reader: " );
 //        Serial.println( s_segment_reader );
+    }
+    else
+    {
+        // update this segment to reflect its actual length...
+        s_segments[s_segment_reader].start_x = snake_erase.x;
+        s_segments[s_segment_reader].start_y = snake_erase.y;
     }
 }
 
