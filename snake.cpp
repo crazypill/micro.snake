@@ -435,7 +435,8 @@ void dump_segments()
         Serial.print( "), dir: (" );
         Serial.print( s_segments[index].dir_x );
         Serial.print( ", " );
-        Serial.println( s_segments[index].dir_y );
+        Serial.print( s_segments[index].dir_y );
+        Serial.println( ")" );
     }
     Serial.print( "count: " );
     Serial.println( s_segment_count );
