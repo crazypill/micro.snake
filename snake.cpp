@@ -46,8 +46,9 @@ static Adafruit_QSPI_Generic flash;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define kMinDelay     5 
-#define kLineWidth    5             // line width is 3 plus one pixel on each side
+#define kMinDelay      5 
+#define kLineWidth     3             
+#define kLineTolerance (kLineWidth + 2)   // line width is 3 plus one pixel on each side
 #define kMaxSegments  100
 #define kScreenWidth  tft.width() 
 #define kScreenHeight tft.height()
@@ -574,7 +575,7 @@ bool apple_in_segment()
     {
         // first segment is at reader index
         int index = (s_segment_reader + i) % kMaxSegments;
-        if( dot_in_segment( apple_x, apple_y, &s_segments[index], kLineWidth ) )
+        if( dot_in_segment( apple_x, apple_y, &s_segments[index], kLineTolerance ) )
             return true;
     }
     
