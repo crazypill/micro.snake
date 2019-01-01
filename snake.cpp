@@ -117,8 +117,6 @@ int16_t get_high_score()
   readFile.read( &score, sizeof( score ) );
   readFile.close();
   return score;
-//    flash.readMemory( 0, s_high_score, sizeof( s_high_score ) );
-//    return *((int16_t*)&s_high_score);
 }
 
 void set_high_score( int16_t score )
@@ -132,8 +130,6 @@ void set_high_score( int16_t score )
 
   writeFile.write( score );
   writeFile.close();
-//    *((int16_t*)&s_high_score) = score;
-//    flash.writeMemory( 0, s_high_score, sizeof( s_high_score ) );
 }
 
 
@@ -229,9 +225,10 @@ bool initialize_graphics()
   DWORD plist[] = {100, 0, 0, 0};  // 1 primary partition with 100% of space.
   uint8_t buf[512] = {0};          // Working buffer for f_fdisk function.
   FRESULT r = f_fdisk(0, plist, buf);
-  if (r != FR_OK) {
+  if( r != FR_OK ) 
+  {
     Serial.print("Error, f_fdisk failed with error code: "); Serial.println(r, DEC);
-    while(1);
+    return false;
   }
   Serial.println("Partitioned flash!");
 
@@ -240,14 +237,17 @@ bool initialize_graphics()
   r = f_mkfs("", FM_ANY, 0, buf, sizeof(buf));
   if (r != FR_OK) {
     Serial.print("Error, f_mkfs failed with error code: "); Serial.println(r, DEC);
-    while(1);
+    return false;
   }
   Serial.println("Formatted flash!");
 #endif  
 
   // Finally test that the filesystem can be mounted.
   if( !fatfs.begin() )
+  {
     Serial.println("Error, failed to mount filesystem!");
+    return false;
+  }
   
   return true;
 }
