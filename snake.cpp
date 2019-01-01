@@ -414,6 +414,17 @@ void move_snake()
 }
 
 
+void debug_draw_segments()
+{
+    for( int i = 0; i < s_segment_count; i++ )
+    {
+        // first segment is at reader index
+        int index = (s_segment_reader + i) % kMaxSegments;
+        tft.drawLine( s_segments[index].start_x, s_segments[index].start_y, s_segments[index].x, s_segments[index].y, ST77XX_WHITE );
+    }
+}
+
+
 void dump_segments()
 {
     for( int i = 0; i < s_segment_count; i++ )
@@ -478,6 +489,7 @@ bool snake_in_segment()
             Serial.println( s_segment_count );
             
             dump_segments();
+            debug_draw_segments();
             return true;
         }
     }
