@@ -5,9 +5,26 @@
 //  Created by Alex Lelievre on 12/26/18.
 //
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// don't erase the screen on game over for debugging collisions
+//#define KEEP_DISPLAY_FOR_DEBUG
+
+// do this once
+//#define ERASE_FLASH
+#define FLASH_FS
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 #include "snake.h"
 
+#ifdef FLASH_FS
 #include <Adafruit_SPIFlash_FatFs.h>
+#endif
 
 //#define FLASH_DEVICE_S25FL1
 #define FLASH_DEVICE_GD25Q
@@ -29,16 +46,8 @@ static Adafruit_QSPI_Generic flash;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// don't erase the screen on game over for debugging collisions
-#define KEEP_DISPLAY_FOR_DEBUG
-
-// do this once
-//#define ERASE_FLASH
-
-
-
 #define kMinDelay     5 
-#define kLineWidth    3
+#define kLineWidth    5             // line width is 3 plus one pixel on each side
 #define kMaxSegments  100
 #define kScreenWidth  tft.width() 
 #define kScreenHeight tft.height()
@@ -61,7 +70,7 @@ typedef struct
     // mostly used for collision
     int16_t  start_x;   // position of where this segment starts
     int16_t  start_y;
-    uint16_t length;    // how long it is...
+    uint16_t length;    // how long it is...only used for snake draw
 } Segment;
 
 #pragma mark -
@@ -84,10 +93,13 @@ static uint16_t s_segment_writer = 0;
 static uint16_t s_segment_reader = 0;
 static Segment  s_segments[kMaxSegments];
 
-static Adafruit_ST7735         tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
-static Adafruit_W25Q16BV_FatFs fatfs( flash );
+static uint8_t s_high_score[512]; // we only make a short out of this whole buffer
 
-static uint8_t s_high_score[512]; // make a short
+static Adafruit_ST7735         tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
+
+#ifdef FLASH_FS
+static Adafruit_W25Q16BV_FatFs fatfs( flash );
+#endif
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +116,7 @@ void print_error( const char* error );
 
 #pragma mark -
 
+#ifdef FLASH_FS
 
 int16_t get_high_score()
 {
@@ -115,11 +128,10 @@ int16_t get_high_score()
   }
 
   int16_t score = 0;
+  readFile.seek( 0 );
   readFile.read( &score, sizeof( score ) );
   readFile.close();
   return score;
-//    flash.readMemory( 0, s_high_score, sizeof( s_high_score ) );
-//    return *((int16_t*)&s_high_score);
 }
 
 void set_high_score( int16_t score )
@@ -131,11 +143,27 @@ void set_high_score( int16_t score )
     return;
   }
 
+  writeFile.seek( 0 );
   writeFile.write( score );
+  writeFile.flush();
   writeFile.close();
-//    *((int16_t*)&s_high_score) = score;
-//    flash.writeMemory( 0, s_high_score, sizeof( s_high_score ) );
 }
+
+#else
+
+int16_t get_high_score()
+{
+    flash.readMemory( 0, s_high_score, sizeof( s_high_score ) );
+    return *((int16_t*)&s_high_score);
+}
+
+void set_high_score( int16_t score )
+{
+    *((int16_t*)&s_high_score) = score;
+    flash.writeMemory( 0, s_high_score, sizeof( s_high_score ) );
+}
+
+#endif // FLASH_FS
 
 
 bool nearly_equals( int16_t p1, int16_t p2, int16_t errorTolerance )
@@ -197,9 +225,11 @@ bool initialize_graphics()
     Serial.println("Could not find flash on QSPI bus!");
 
   flash.setFlashType( SPIFLASHTYPE_W25Q16BV );
-  fatfs.activate();
-  
+
+#ifdef FLASH_FS
 #ifdef ERASE_FLASH
+  fatfs.activate();
+
   // Partition the flash with 1 partition that takes the entire space.
   Serial.println("Partitioning flash with 1 primary partition...");
   DWORD plist[] = {100, 0, 0, 0};  // 1 primary partition with 100% of space.
@@ -221,7 +251,7 @@ bool initialize_graphics()
     return false;
   }
   Serial.println("Formatted flash!");
-#endif  
+#endif // ERASE_FLASH
 
   // Finally test that the filesystem can be mounted.
   if( !fatfs.begin() )
@@ -229,6 +259,13 @@ bool initialize_graphics()
     Serial.println("Error, failed to mount filesystem!");
     return false;
   }
+#else
+#ifdef ERASE_FLASH
+    Serial.println( "Formatting flash (this takes ~20 seconds)..." );
+    flash.chipErase();
+    Serial.println( "Formatted flash!" );
+#endif  // ERASE_FLASH     
+#endif  // FLASH_FS
   
   return true;
 }
@@ -446,6 +483,7 @@ bool snake_in_segment()
         int index = (s_segment_reader + i) % kMaxSegments;
         if( dot_in_segment( snake_draw.x, snake_draw.y, &s_segments[index], 0 ) )
         {
+#ifdef KEEP_DISPLAY_FOR_DEBUG
             Serial.print( "snake_in_segment: " ); 
             Serial.print( index );
             Serial.print( "[" );
@@ -474,6 +512,7 @@ bool snake_in_segment()
             Serial.println( s_segment_count );
             
             dump_segments();
+#endif            
             return true;
         }
     }
