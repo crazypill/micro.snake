@@ -30,7 +30,7 @@ static Adafruit_QSPI_Generic flash;
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // don't erase the screen on game over for debugging collisions
-//#define KEEP_DISPLAY_FOR_DEBUG
+#define KEEP_DISPLAY_FOR_DEBUG
 
 // do this once
 //#define ERASE_FLASH
@@ -117,6 +117,8 @@ int16_t get_high_score()
   readFile.read( &score, sizeof( score ) );
   readFile.close();
   return score;
+//    flash.readMemory( 0, s_high_score, sizeof( s_high_score ) );
+//    return *((int16_t*)&s_high_score);
 }
 
 void set_high_score( int16_t score )
@@ -130,6 +132,8 @@ void set_high_score( int16_t score )
 
   writeFile.write( score );
   writeFile.close();
+//    *((int16_t*)&s_high_score) = score;
+//    flash.writeMemory( 0, s_high_score, sizeof( s_high_score ) );
 }
 
 
@@ -227,15 +231,16 @@ bool initialize_graphics()
   FRESULT r = f_fdisk(0, plist, buf);
   if( r != FR_OK ) 
   {
-    Serial.print("Error, f_fdisk failed with error code: "); Serial.println(r, DEC);
+    Serial.print( "Error, f_fdisk failed with error code: " ); Serial.println( r, DEC );
     return false;
   }
-  Serial.println("Partitioned flash!");
+  Serial.println( "Partitioned flash!" );
 
   // Make filesystem.
-  Serial.println("Creating and formatting FAT filesystem (this takes ~60 seconds)...");
-  r = f_mkfs("", FM_ANY, 0, buf, sizeof(buf));
-  if (r != FR_OK) {
+  Serial.println( "Creating and formatting FAT filesystem (this takes ~60 seconds)..." );
+  r = f_mkfs( "", FM_ANY, 0, buf, sizeof(buf) );
+  if (r != FR_OK) 
+  {
     Serial.print("Error, f_mkfs failed with error code: "); Serial.println(r, DEC);
     return false;
   }
@@ -414,7 +419,7 @@ void dump_segments()
     for( int i = 0; i < s_segment_count; i++ )
     {
         // first segment is at reader index
-        int index = s_segment_reader + i;
+        int index = (s_segment_reader + i) % kMaxSegments;
         Serial.print( "segment: " ); 
         Serial.print( index );
         Serial.print( "[" );
@@ -430,9 +435,7 @@ void dump_segments()
         Serial.print( "), dir: (" );
         Serial.print( s_segments[index].dir_x );
         Serial.print( ", " );
-        Serial.print( s_segments[index].dir_y );
-        Serial.print( "), length: " );
-        Serial.println( s_segments[index].length );
+        Serial.println( s_segments[index].dir_y );
     }
     Serial.print( "count: " );
     Serial.println( s_segment_count );
@@ -445,7 +448,7 @@ bool snake_in_segment()
     for( int i = 0; i < s_segment_count; i++ )
     {
         // first segment is at reader index
-        int index = s_segment_reader + i;
+        int index = (s_segment_reader + i) % kMaxSegments;
         if( dot_in_segment( snake_draw.x, snake_draw.y, &s_segments[index] ) )
         {
             Serial.print( "snake_in_segment: " ); 
@@ -468,9 +471,7 @@ bool snake_in_segment()
             Serial.print( s_segments[index].x );
             Serial.print( ", " );
             Serial.print( s_segments[index].y );
-            Serial.print( "), length: " );
-            Serial.print( s_segments[index].length );
-            Serial.print( ", writer index: " );
+            Serial.print( "), writer index: " );
             Serial.print( s_segment_writer );
             Serial.print( ", segment count: " );
             Serial.println( s_segment_count );
@@ -536,7 +537,7 @@ bool apple_in_segment()
     for( int i = 0; i < s_segment_count; i++ )
     {
         // first segment is at reader index
-        int index = s_segment_reader + i;
+        int index = (s_segment_reader + i) % kMaxSegments;
         if( dot_in_segment( apple_x, apple_y, &s_segments[index] ) )
             return true;
     }
@@ -572,6 +573,7 @@ void add_segment()
     // used for collision testing of this segment
     s_segments[s_segment_writer].start_x = seg_start_x;
     s_segments[s_segment_writer].start_y = seg_start_y;
+    s_segments[s_segment_writer].length  = fast_hvline_length( snake_draw.x - seg_start_x, snake_draw.y - seg_start_y );
     ++s_segment_writer;
     ++s_segment_count;
     
@@ -596,7 +598,9 @@ void check_for_direction_change()
         return;
         
     // see if we are standing on a direction change
-    if( s_segments[s_segment_reader].x == snake_erase.x && s_segments[s_segment_reader].y == snake_erase.y )
+    int index = (s_segment_reader + i) % kMaxSegments;
+
+    if( s_segments[index].x == snake_erase.x && s_segments[index].y == snake_erase.y )
     {
         // read the data and pop it off
         snake_erase.dir_x = s_segments[s_segment_reader].dir_x;
@@ -617,8 +621,8 @@ void check_for_direction_change()
     else
     {
         // update this segment to reflect its actual length...
-        s_segments[s_segment_reader].start_x = snake_erase.x;
-        s_segments[s_segment_reader].start_y = snake_erase.y;
+        s_segments[index].start_x = snake_erase.x;
+        s_segments[index].start_y = snake_erase.y;
     }
 }
 
