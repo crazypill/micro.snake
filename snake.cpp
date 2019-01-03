@@ -95,12 +95,12 @@ static uint16_t s_segment_writer = 0;
 static uint16_t s_segment_reader = 0;
 static Segment  s_segments[kMaxSegments];
 
-static uint8_t s_high_score[512]; // we only make a short out of this whole buffer
-
-static Adafruit_ST7735         tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
+static Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS,  TFT_DC, TFT_RST );
 
 #ifdef FLASH_FS
 static Adafruit_W25Q16BV_FatFs fatfs( flash );
+#else
+static uint8_t s_high_score[512]; // we only make a short out of this whole buffer
 #endif
 
 
